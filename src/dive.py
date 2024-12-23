@@ -2,8 +2,8 @@ import random
 import numpy as np
 
 MOVE_UP = 0
-MOVE_DOWN = 1
-MOVE_LEFT = 2
+MOVE_DOWN = 2
+MOVE_LEFT = 1
 MOVE_RIGHT = 3
 
 def slide_row(row: np.ndarray):
@@ -123,7 +123,7 @@ class Board:
         return [move for move, (_, moved, _) in enumerate(self.next) if moved]
     
     def move_reward(self):
-        return [score if moved else self.invalid_penalty for (_, moved, score) in self.next]
+        return np.array([score if moved else self.invalid_penalty for (_, moved, score) in self.next])
 
     def game_over(self):
         return not any(item[1] for item in self.next) or np.any(self.tiles > self.max_value)
