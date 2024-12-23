@@ -44,6 +44,26 @@ def slide(tiles: np.ndarray):
         score += row_score
     return tiles_new, moved, score
 
+def slide_to(tiles: np.ndarray, move):
+        if move == MOVE_UP:
+            tiles, moved, score = slide(tiles.T)
+            return tiles.T, moved, score
+        if move == MOVE_DOWN:
+            tiles, moved, score = slide(np.flip(tiles.T, axis=-1))
+            return np.flip(tiles, axis=-1).T, moved, score
+        if move == MOVE_LEFT:
+            tiles, moved, score = slide(tiles)
+            return tiles, moved, score
+        if move == MOVE_RIGHT:
+            tiles, moved, score = slide(np.flip(tiles, axis=-1))
+            return np.flip(tiles, axis=-1), moved, score
+
+def scan(tiles: np.ndarray):
+    result = []
+    for move in range(4):
+        result.append(slide_to(tiles, move))
+    return result
+
 def zero_tiles(tiles: np.ndarray):
     zero_indices = np.where(tiles == 0)
     return list(zip(zero_indices[0], zero_indices[1]))
@@ -60,7 +80,14 @@ class Board:
         self.tile_spawn = tile_spawn
         self.rng = random.Random()
         self.max_value = max_value
+        self.invalid_penalty = invalid_penalty
         self.new_board(seed)
+
+    def spawn(self):
+        empty_tiles = zero_tiles(self.tiles)
+        coord = self.rng.choice(empty_tiles)
+        new_tile = self.rng.choice(self.tile_spawn)
+        self.tiles[coord[0], coord[1]] = new_tile
 
     def new_board(self, seed=None):
         self.tiles = np.zeros(self.size, dtype=np.int16)
@@ -73,27 +100,16 @@ class Board:
         # place two initial tiles
         self.spawn()
         self.spawn()
-        self.scan()
+        self.update()
 
-    def slide(self, move):
-        if move == MOVE_UP:
-            tiles, moved, score = slide(self.tiles.T)
-            return tiles.T, moved, score
-        if move == MOVE_DOWN:
-            tiles, moved, score = slide(np.flip(self.tiles.T, axis=-1))
-            return np.flip(tiles, axis=-1).T, moved, score
-        if move == MOVE_LEFT:
-            tiles, moved, score = slide(self.tiles)
-            return tiles, moved, score
-        if move == MOVE_RIGHT:
-            tiles, moved, score = slide(np.flip(self.tiles, axis=-1))
-            return np.flip(tiles, axis=-1), moved, score
+    def load(self, tiles, score=0, turn=0):
+        self.tiles = tiles
+        self.score = score
+        self.turn = turn
+        self.update()
 
-    def scan(self):
-        result = []
-        for move in range(4):
-            result.append(self.slide(move))
-        self.next = result
+    def update(self):
+        self.next = scan(self.tiles)
     
     def act(self, move):
         if self.next[move][1]:
@@ -101,16 +117,16 @@ class Board:
             self.score += self.next[move][2]
             self.turn += 1
             self.spawn()
-            self.scan()
+            self.update()
+
+    def valid_moves(self):
+        return [move for move, (_, moved, _) in enumerate(self.next) if moved]
+    
+    def move_reward(self):
+        return [score if moved else self.invalid_penalty for (_, moved, score) in self.next]
 
     def game_over(self):
         return not any(item[1] for item in self.next) or np.any(self.tiles > self.max_value)
-
-    def spawn(self):
-        empty_tiles = zero_tiles(self.tiles)
-        coord = self.rng.choice(empty_tiles)
-        new_tile = self.rng.choice(self.tile_spawn)
-        self.tiles[coord[0], coord[1]] = new_tile
 
     def possible_value(self):
         vals = []
