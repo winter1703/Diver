@@ -33,7 +33,7 @@ def slide_row(row: np.ndarray):
     return row, moved, score
 
 def slide(tiles: np.ndarray):
-    # tiles: [K, N]
+    # tiles: [M, N]
     tiles_new = np.zeros_like(tiles)
     moved = False
     score = 0
