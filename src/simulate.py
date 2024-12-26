@@ -1,45 +1,98 @@
 import time
+import multiprocessing
 import numpy as np
-import tqdm
+import torch
+from tqdm import tqdm  # Correct import
 from .dive import Board
 
 class Simulator:
-    def __init__(self, policy):
+    def __init__(self, policy, board_kwargs=None):
         self.policy = policy
+        self.board_kwargs = board_kwargs or {}
+        self.new_board()
 
-    def step(self, board: Board, state):
-        possible_boards = [board.possible_boards(move) for move in range(4)]
-        action, state, q_values = self.policy(tiles=board.tiles,
-                                  valid_moves=board.valid_moves(),
-                                  rewards=board.move_reward(),
-                                  state=state,
-                                  p_boards=possible_boards)
-        board.act(action)
-        return action, state, q_values
+    def new_board(self, seed=None):
+        self.board = Board(seed=seed, **self.board_kwargs)
+        self.state = None
 
-    def play(self):
-        board = Board()
-        seed = board.seed
-        state = None # optional memory slot for policy
-        actions = []
-        train_data = []
+    def step(self):
+        possible_boards = [self.board.possible_boards(move) for move in range(4)]
+        action, state, q_values = self.policy(
+            tiles=self.board.tiles,
+            valid_moves=self.board.valid_moves(),
+            rewards=self.board.move_reward(),
+            state=self.state,
+            p_boards=possible_boards
+        )
+        self.board.act(action)
+        self.state = state
+        return action, q_values
 
-        while not board.game_over():
-            action, state, q_values = self.step(board, state)
-            actions.append(action)
-            train_data.append((board.tiles, q_values))
-            
-        final_score = board.score
-        return seed, actions, final_score, train_data
-    
+    def generate_data(self, buffer_size=100000, save_path=None, pbar=None):
+        boards = torch.zeros(buffer_size, *self.board.size, dtype=torch.int16)
+        q_values = torch.zeros(buffer_size, 4)
+
+        for i in range(buffer_size):
+            boards[i, :, :] = torch.Tensor(self.board.tiles.copy())
+            _, q = self.step()
+            q_values[i, :] = torch.Tensor(q)
+
+            if self.board.game_over():
+                self.new_board()
+
+            if pbar:
+                pbar.update(1)  # Update the progress bar
+
+        if save_path:
+            torch.save({"boards": boards, "q_values": q_values}, save_path)
+        else:
+            return boards, q_values
+
+    def play(self, seed=None):
+        self.new_board(seed)
+        while not self.board.game_over():
+            self.step()
+
     def demo(self, interval=0.5):
-        board = Board()
-        state = None
-        print(board)
-        while not board.game_over():
-            _, state, _ = self.step(board, state)
-            print(board)
+        self.new_board()
+        print(self.board)
+        while not self.board.game_over():
+            self.step()
+            print(self.board)
             time.sleep(interval)
+
+def batch_generate_data(policy, save_path, num_workers=5, buffer_size=100000, board_kwargs=None):
+    def worker(worker_id, policy, buffer_size, board_kwargs, results):
+        simulator = Simulator(policy, board_kwargs)
+        with tqdm(total=buffer_size, desc=f"Worker {worker_id}", position=worker_id) as pbar:
+            boards, q_values = simulator.generate_data(buffer_size=buffer_size, pbar=pbar)
+        results[worker_id] = (boards, q_values)
+
+    manager = multiprocessing.Manager()
+    results = manager.dict()
+    processes = []
+
+    # Calculate the buffer size for each worker
+    worker_buffer_size = buffer_size // num_workers
+
+    # Create and start processes
+    for i in range(num_workers):
+        process = multiprocessing.Process(target=worker, args=(i, policy, worker_buffer_size, board_kwargs, results))
+        processes.append(process)
+        process.start()
+
+    # Wait for all processes to finish
+    for process in processes:
+        process.join()
+
+    # Combine results from all workers
+    all_boards = torch.cat([results[i][0] for i in range(num_workers)])
+    all_q_values = torch.cat([results[i][1] for i in range(num_workers)])
+
+    # Save the combined data
+    torch.save({"boards": all_boards, "q_values": all_q_values}, save_path)
+
+    print(f"Data generation complete. Saved to {save_path}")
 
 def compare_policy(policy_dict, n_run=1000):
     results = {}
@@ -48,7 +101,7 @@ def compare_policy(policy_dict, n_run=1000):
         sim = Simulator(policy)
         scores = np.zeros(n_run)
         print(f"Running policy {name} for {n_run} times")
-        for i in tqdm.tqdm(range(n_run)):
+        for i in tqdm(range(n_run)):
             _, _, score, _ = sim.play()
             scores[i] = score
         results[name] = scores
