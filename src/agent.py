@@ -31,6 +31,9 @@ def model_scan(boards: np.ndarray):
         q_value[k, :] = q_scan(boards[k, :, :])
     return q_value
     
+def get_policy_search(epsilon=0.0):
+    search_agent = DQNAgent(model_scan, epsilon=epsilon)
+    return search_agent.policy
 
 class DQNAgent:
     def __init__(self, model, epsilon=0.05, gamma=0.99):
@@ -47,13 +50,13 @@ class DQNAgent:
             else:
                 q_value[move] = rewards[move]
         if random.random() < self.epsilon:
-            return random.randint(), None, q_value
+            return random.randint(0, 3), None, q_value
         else:
             return max_q_idx(q_value), None, q_value
 
     def policy_no_search(self, tiles, **kwargs):
         q_value = self.model(tiles)
         if random.random() < self.epsilon:
-            return random.randint(), None, q_value
+            return random.randint(0, 3), None, q_value
         else:
             return max_q_idx(q_value), None, q_value

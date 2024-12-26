@@ -154,17 +154,3 @@ class Board:
         s += "\n"
         s += "=" * 20
         return s
-
-if __name__ == "__main__":
-    board = Board()
-    mapping = {
-        "w": MOVE_UP,
-        "a": MOVE_LEFT,
-        "s": MOVE_DOWN,
-        "d": MOVE_RIGHT,
-    }
-    while not board.game_over():
-        print(board)
-        move = random.choice(["w", "a", "s", "d"])
-        board.act(mapping[move])
-    print(board)
