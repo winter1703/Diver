@@ -1,8 +1,6 @@
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
-from .model import DiveModel
-from .embed import DiveEmbed
-from .dive import Board
 
 class DiveTrainer:
     def __init__(self, model, train_dataloader, val_dataloader, optimizer, device="cuda"):
@@ -15,7 +13,7 @@ class DiveTrainer:
     def train_epoch(self):
         self.model.train()
         total_loss = 0
-        for boards, q_values in self.train_dataloader:
+        for boards, q_values in tqdm(self.train_dataloader, desc="Training"):
             boards = boards.to(self.device)
             q_values = q_values.to(self.device)
             
@@ -32,7 +30,7 @@ class DiveTrainer:
         self.model.eval()
         total_loss = 0
         with torch.no_grad():
-            for boards, q_values in self.val_dataloader:
+            for boards, q_values in tqdm(self.val_dataloader, desc="Evaluating"):
                 boards = boards.to(self.device)
                 q_values = q_values.to(self.device)
                 

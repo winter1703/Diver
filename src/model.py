@@ -26,6 +26,7 @@ class DiveBlock(nn.Module):
 class DiveModel(nn.Module):
     def __init__(self,
                  d_embed,
+                 d_vocab,
                  n_block = 2,
                  d_hidden = None,
                  d_board = (4, 4),                 
@@ -35,6 +36,7 @@ class DiveModel(nn.Module):
         if not d_hidden:
             d_hidden = 4 * d_embed
         d_flatten = d_board[0] * d_board[1] * d_embed
+        self.embed = nn.Embedding(d_vocab, d_embed)
         self.blocks = nn.Sequential(*[DiveBlock(d_embed, d_hidden, d_board) for i in range(n_block)])
         self.q_head = nn.Sequential(nn.Linear(d_flatten, d_flatten),
                                     nn.ReLU(),
@@ -42,6 +44,7 @@ class DiveModel(nn.Module):
         
     def forward(self, x: torch.Tensor):
         # x: [B, M, N, C], y: [B, d_output = 4]
+        x = self.embed(x.long())
         x = x.permute(0, 3, 1, 2)
         x = self.blocks(x)
         y = x.flatten(-3, -1)
