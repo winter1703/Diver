@@ -29,24 +29,24 @@ class DiveModel(nn.Module):
                  d_vocab,
                  n_block = 2,
                  d_hidden = None,
+                 d_head = None,
                  d_board = (4, 4),                 
                  d_output = 4,
+                 sum_output = False,
                  ):
         super().__init__()
-        if not d_hidden:
-            d_hidden = 4 * d_embed
+        d_hidden = d_hidden or 4 * d_embed
+        d_head = d_head or d_flatten
         d_flatten = d_board[0] * d_board[1] * d_embed
         self.embed = nn.Embedding(d_vocab, d_embed)
         self.blocks = nn.Sequential(*[DiveBlock(d_embed, d_hidden, d_board) for i in range(n_block)])
-        self.q_head = nn.Sequential(nn.Linear(d_flatten, d_flatten),
-                                    nn.ReLU(),
-                                    nn.Linear(d_flatten, d_output))
+        self.q_head = nn.Conv2d(d_embed, d_output, (1, 1))
+        self.sum_output = sum_output
         
     def forward(self, x: torch.Tensor):
         # x: [B, M, N, C], y: [B, d_output = 4]
         x = self.embed(x.long())
         x = x.permute(0, 3, 1, 2)
         x = self.blocks(x)
-        y = x.flatten(-3, -1)
-        y = self.q_head(y)
-        return y
+        x = self.q_head(x)
+        return torch.sum(x, dim=(-2, -1)) if self.sum_output else x

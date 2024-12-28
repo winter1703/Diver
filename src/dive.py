@@ -10,7 +10,7 @@ def slide_row(row: np.ndarray):
     # row: [N]
     row = row.copy()
     moved = False
-    score = 0
+    reward = np.zeros_like(row)
     pointer = 0
     for i in range(row.size):
         if i == 0 or row[i] == 0:
@@ -21,7 +21,7 @@ def slide_row(row: np.ndarray):
             moved = True
         else:
             if row[i] % row[pointer] == 0 or row[pointer] % row[i] == 0:
-                score += min(row[i], row[pointer])
+                reward[pointer] = min(row[i], row[pointer])
                 row[pointer] = row[pointer] + row[i]
                 row[i] = 0
                 moved = True
@@ -30,33 +30,33 @@ def slide_row(row: np.ndarray):
                 row[i] = 0
                 moved = True
             pointer += 1
-    return row, moved, score
+    return row, moved, reward
 
 def slide(tiles: np.ndarray):
     # tiles: [M, N]
     tiles_new = np.zeros_like(tiles)
     moved = False
-    score = 0
-    for k in range(tiles.shape[0]):
-        row, row_moved, row_score = slide_row(tiles[k, :])
-        tiles_new[k, :] = row
+    reward = np.zeros_like(tiles)
+    for m in range(tiles.shape[0]):
+        row, row_moved, row_reward = slide_row(tiles[m, :])
+        tiles_new[m, :] = row
         moved = moved or row_moved
-        score += row_score
-    return tiles_new, moved, score
+        reward[m, :] = row_reward
+    return tiles_new, moved, reward
 
 def slide_to(tiles: np.ndarray, move):
         if move == MOVE_UP:
-            tiles, moved, score = slide(tiles.T)
-            return tiles.T, moved, score
+            tiles, moved, reward = slide(tiles.T)
+            return tiles.T, moved, reward.T
         if move == MOVE_DOWN:
-            tiles, moved, score = slide(np.flip(tiles.T, axis=-1))
-            return np.flip(tiles, axis=-1).T, moved, score
+            tiles, moved, reward = slide(np.flip(tiles.T, axis=-1))
+            return np.flip(tiles, axis=-1).T, moved, np.flip(reward, axis=-1).T
         if move == MOVE_LEFT:
             tiles, moved, score = slide(tiles)
-            return tiles, moved, score
+            return tiles, moved, reward
         if move == MOVE_RIGHT:
             tiles, moved, score = slide(np.flip(tiles, axis=-1))
-            return np.flip(tiles, axis=-1), moved, score
+            return np.flip(tiles, axis=-1), moved, np.flip(reward, axis=-1)
 
 def scan(tiles: np.ndarray):
     result = []
@@ -114,7 +114,7 @@ class Board:
     def act(self, move):
         if self.next[move][1]:
             self.tiles = self.next[move][0]
-            self.score += self.next[move][2]
+            self.score += np.sum(self.next[move][2])
             self.turn += 1
             self.spawn()
             self.update()
@@ -123,10 +123,10 @@ class Board:
         return [move for move, (_, moved, _) in enumerate(self.next) if moved]
     
     def move_reward(self):
-        return np.array([score if moved else self.invalid_penalty for (_, moved, score) in self.next])
+        return np.array([reward if moved else self.invalid_penalty for (_, moved, reward) in self.next])
 
     def game_over(self):
-        return not any(item[1] for item in self.next) or np.any(self.tiles > self.max_value)
+        return not any(item[1] for item in self.next) or np.any(self.tiles >= self.max_value)
 
     def possible_value(self):
         vals = []
