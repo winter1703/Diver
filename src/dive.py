@@ -52,10 +52,10 @@ def slide_to(tiles: np.ndarray, move):
             tiles, moved, reward = slide(np.flip(tiles.T, axis=-1))
             return np.flip(tiles, axis=-1).T, moved, np.flip(reward, axis=-1).T
         if move == MOVE_LEFT:
-            tiles, moved, score = slide(tiles)
+            tiles, moved, reward = slide(tiles)
             return tiles, moved, reward
         if move == MOVE_RIGHT:
-            tiles, moved, score = slide(np.flip(tiles, axis=-1))
+            tiles, moved, reward = slide(np.flip(tiles, axis=-1))
             return np.flip(tiles, axis=-1), moved, np.flip(reward, axis=-1)
 
 def scan(tiles: np.ndarray):
@@ -73,7 +73,7 @@ class Board:
                  size = (4, 4),
                  tile_spawn = [2, 3, 5, 7],
                  seed = None,
-                 invalid_penalty = -10,
+                 invalid_penalty = -1,
                  max_value = 10000,
                  max_bonus = 1000):
         self.size = size
@@ -123,7 +123,8 @@ class Board:
         return [move for move, (_, moved, _) in enumerate(self.next) if moved]
     
     def move_reward(self):
-        return np.array([reward if moved else self.invalid_penalty for (_, moved, reward) in self.next])
+        reward_invalid = np.full_like(self.tiles, self.invalid_penalty)
+        return np.array([reward if moved else reward_invalid for (_, moved, reward) in self.next])
 
     def game_over(self):
         return not any(item[1] for item in self.next) or np.any(self.tiles >= self.max_value)

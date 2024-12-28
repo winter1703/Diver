@@ -3,6 +3,7 @@ import numpy as np
 from .dive import scan
 
 def max_q_idx(q):
+    q = np.sum(q, axis=(-2, -1))
     max_value = max(q)
     max_indices = [i for i, val in enumerate(q) if val == max_value]
     return random.choice(max_indices)
@@ -18,7 +19,7 @@ def policy_rotate(rewards, state, valid_moves, **kwargs):
     return state, (state + 1) % 4, rewards
     
 def policy_greed(rewards, **kwargs):
-    return max_q_idx(np.sum(rewards, axis=(-2, -1))), None, rewards
+    return max_q_idx(rewards), None, rewards
 
 def q_scan(tiles: np.ndarray):
     return np.array([reward for (_, _, reward) in scan(tiles)])
@@ -36,13 +37,17 @@ def softmax(x, axis=None, temp=1.0):
     x_exp = np.exp(x_scaled - np.max(x_scaled, axis=axis, keepdims=True))
     return x_exp / np.sum(x_exp, axis=axis, keepdims=True)
 
-def expected_max_q(pq_value, temp=1.0):
+def expected_max_q(pq_value, temp=1.0, use_softmax=False):
     sums = np.sum(pq_value, axis=(2, 3))
-    softmax_probs = softmax(sums, axis=1, temp=temp)
-    softmax_probs = softmax_probs[:, :, np.newaxis, np.newaxis]
-    weighted_arrays = pq_value * softmax_probs
-    weighted_sum = np.sum(weighted_arrays, axis=1)
-    result = np.mean(weighted_sum, axis=0)
+    if use_softmax:
+        softmax_probs = softmax(sums, axis=1, temp=temp)
+        softmax_probs = softmax_probs[:, :, np.newaxis, np.newaxis]
+        weighted_arrays = pq_value * softmax_probs
+        weighted_sum = np.sum(weighted_arrays, axis=1)
+        result = np.mean(weighted_sum, axis=0)
+    else:
+        max_indices = np.argmax(sums, axis=1)
+        result = np.mean(pq_value[np.arange(pq_value.shape[0]), max_indices], axis=0)
     return result
     
 def get_policy_search(epsilon=0.0):
@@ -57,7 +62,7 @@ class DQNAgent:
 
     def policy(self, tiles, valid_moves, rewards, p_boards, **kwargs):
         M, N = tiles.shape[-2], tiles.shape[-1]
-        q_value = np.zeros(4, M, N)
+        q_value = np.zeros((4, M, N))
         for move in range(4):
             if move in valid_moves:
                 q_move = expected_max_q(self.model(p_boards[move]))

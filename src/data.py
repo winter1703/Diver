@@ -3,7 +3,7 @@ from torch.utils import data
 from torch.utils.data import random_split
 
 class DiveDataset(data.Dataset):
-    def __init__(self, data_path, q_scale=0.05, augment=False):
+    def __init__(self, data_path, q_scale=0.5, augment=True):
         data = torch.load(data_path, weights_only=True)
         self.boards = data["boards"]
         self.q_values = data["q_values"]
@@ -27,39 +27,45 @@ class DiveDataset(data.Dataset):
         # Randomly select one of the 8 possible transformations
         transform_idx = torch.randint(0, 8, (1,)).item()
         
-        # Apply the transformation to the board
+        # Apply the transformation to the board and q_value
         if transform_idx == 0:
             # Identity (no transformation)
             pass
         elif transform_idx == 1:
             # Rotate 90 degrees clockwise
             board = torch.rot90(board, k=1, dims=[0, 1])
-            q_value = torch.roll(q_value, shifts=-1, dims=0)
+            q_value = torch.rot90(q_value, k=1, dims=[1, 2])
+            q_value = q_value[[3, 0, 1, 2], :, :]  # Reorder move dimensions
         elif transform_idx == 2:
             # Rotate 180 degrees
             board = torch.rot90(board, k=2, dims=[0, 1])
-            q_value = torch.roll(q_value, shifts=2, dims=0)
+            q_value = torch.rot90(q_value, k=2, dims=[1, 2])
+            q_value = q_value[[2, 3, 0, 1], :, :]  # Reorder move dimensions
         elif transform_idx == 3:
             # Rotate 270 degrees clockwise
             board = torch.rot90(board, k=3, dims=[0, 1])
-            q_value = torch.roll(q_value, shifts=1, dims=0)
+            q_value = torch.rot90(q_value, k=3, dims=[1, 2])
+            q_value = q_value[[1, 2, 3, 0], :, :]  # Reorder move dimensions
         elif transform_idx == 4:
             # Flip vertically
             board = torch.flip(board, dims=[0])
-            q_value = torch.flip(q_value, dims=[0])
-            q_value = torch.roll(q_value, shifts=2, dims=0)
+            q_value = torch.flip(q_value, dims=[1])
+            q_value = q_value[[2, 1, 0, 3], :, :]  # Reorder move dimensions
         elif transform_idx == 5:
             # Flip horizontally
             board = torch.flip(board, dims=[1])
-            q_value = torch.flip(q_value, dims=[0])
+            q_value = torch.flip(q_value, dims=[2])
+            q_value = q_value[[0, 3, 2, 1], :, :]  # Reorder move dimensions
         elif transform_idx == 6:
             # Flip along the main diagonal
             board = torch.transpose(board, 0, 1)
-            q_value = torch.roll(q_value, shifts=1, dims=0)
+            q_value = torch.transpose(q_value, 1, 2)
+            q_value = q_value[[1, 0, 3, 2], :, :]  # Reorder move dimensions
         elif transform_idx == 7:
             # Flip along the anti-diagonal
             board = torch.rot90(torch.flip(board, dims=[0, 1]), k=1, dims=[0, 1])
-            q_value = torch.roll(q_value, shifts=-1, dims=0)
+            q_value = torch.rot90(torch.flip(q_value, dims=[1, 2]), k=1, dims=[1, 2])
+            q_value = q_value[[3, 2, 1, 0], :, :]  # Reorder move dimensions
         
         return board, q_value
 
@@ -78,9 +84,9 @@ class DiveDataset(data.Dataset):
         mse_loss = torch.mean((self.q_values - baseline_q_values) ** 2)
         return mean_q_value.item(), (self.q_scale ** 2) * mse_loss.item()
 
-def get_dataloader(data_path, batch_size=32, shuffle=True, num_workers=4, val_split=0.2, q_scale=0.05):
+def get_dataloader(data_path, batch_size=32, shuffle=True, num_workers=4, val_split=0.2, q_scale=0.5):
     # Load the dataset
-    dataset = DiveDataset(data_path, q_scale)
+    dataset = DiveDataset(data_path, q_scale, augment=True)
     
     # Calculate the sizes for training and validation sets
     val_size = int(val_split * len(dataset))
@@ -108,7 +114,7 @@ def get_dataloader(data_path, batch_size=32, shuffle=True, num_workers=4, val_sp
 
 if __name__ == "__main__":
     # Load the dataset
-    dataset = DiveDataset("data/data_easy_1m.pt")
+    dataset = DiveDataset("data/grid_easy_1m.pt")
     
     # Print board statistics
     # print("Board Statistics:", dataset.get_board_statistics(True))

@@ -30,12 +30,12 @@ class Simulator:
 
     def generate_data(self, buffer_size=100000, save_path=None, pbar=None):
         boards = torch.zeros(buffer_size, *self.board.size, dtype=torch.int16)
-        q_values = torch.zeros(buffer_size, 4)
+        q_values = torch.zeros(buffer_size, 4, *self.board.size)
 
         for i in range(buffer_size):
-            boards[i, :, :] = torch.Tensor(self.board.tiles.copy())
+            boards[i] = torch.Tensor(self.board.tiles.copy())
             _, q = self.step()
-            q_values[i, :] = torch.Tensor(q)
+            q_values[i] = torch.Tensor(q)
 
             if self.board.game_over():
                 self.new_board()
@@ -52,6 +52,7 @@ class Simulator:
         self.new_board(seed)
         while not self.board.game_over():
             self.step()
+        return self.board.score
 
     def demo(self, interval=0.5):
         self.new_board()
@@ -104,7 +105,7 @@ def compare_policy(policy_dict, n_run=1000):
         scores = np.zeros(n_run)
         print(f"Running policy {name} for {n_run} times")
         for i in tqdm(range(n_run)):
-            _, _, score, _ = sim.play()
+            score = sim.play()
             scores[i] = score
         results[name] = scores
         print(f"Max score: {scores.max()}")
