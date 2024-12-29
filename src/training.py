@@ -2,6 +2,11 @@ from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 
+def combined_loss(prediction: torch.Tensor, target: torch.Tensor, eta=1):
+    loss = F.mse_loss(prediction, target)
+    sum_loss = F.mse_loss(prediction.sum(dim=(-2, -1)), target.sum(dim=(-2, -1)))
+    return loss + eta * sum_loss
+
 class DiveTrainer:
     def __init__(self, model, train_dataloader, val_dataloader, optimizer, device="cuda"):
         self.model = model.to(device)
@@ -19,7 +24,7 @@ class DiveTrainer:
             
             self.optimizer.zero_grad()
             outputs = self.model(boards)
-            loss = F.mse_loss(outputs, q_values)
+            loss = combined_loss(outputs, q_values)
             loss.backward()
             self.optimizer.step()
             
@@ -35,7 +40,7 @@ class DiveTrainer:
                 q_values = q_values.to(self.device)
                 
                 outputs = self.model(boards)
-                loss = F.mse_loss(outputs, q_values)
+                loss = combined_loss(outputs, q_values)
                 total_loss += loss.item()
         return total_loss / len(self.val_dataloader)
 

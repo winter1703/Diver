@@ -131,7 +131,7 @@ class Board:
 
     def possible_value(self):
         vals = []
-        for i in range(self.max_value + 1):
+        for i in range(self.max_value):
             for p in self.tile_spawn:
                 if i % p == 0:
                     vals.append(i)

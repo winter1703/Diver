@@ -97,11 +97,11 @@ def batch_generate_data(policy, save_path, num_workers=5, buffer_size=100000, bo
 
     print(f"Data generation complete. Saved to {save_path}")
 
-def compare_policy(policy_dict, n_run=1000):
+def compare_policy(policy_dict, n_run=1000, board_kwargs=None):
     results = {}
     for name in policy_dict:
         policy = policy_dict[name]
-        sim = Simulator(policy)
+        sim = Simulator(policy, board_kwargs)
         scores = np.zeros(n_run)
         print(f"Running policy {name} for {n_run} times")
         for i in tqdm(range(n_run)):

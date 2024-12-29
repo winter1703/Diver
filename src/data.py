@@ -1,4 +1,6 @@
 import torch
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from torch.utils import data
 from torch.utils.data import random_split
 
@@ -81,8 +83,8 @@ class DiveDataset(data.Dataset):
     def get_baseline_q_value_mse(self):
         mean_q_value = torch.mean(self.q_values)
         baseline_q_values = torch.full_like(self.q_values, mean_q_value)
-        mse_loss = torch.mean((self.q_values - baseline_q_values) ** 2)
-        return mean_q_value.item(), (self.q_scale ** 2) * mse_loss.item()
+        loss = (self.q_scale ** 2) * F.mse_loss(baseline_q_values, self.q_values)
+        return loss
 
 def get_dataloader(data_path, batch_size=32, shuffle=True, num_workers=4, val_split=0.2, q_scale=0.5):
     # Load the dataset
@@ -112,23 +114,69 @@ def get_dataloader(data_path, batch_size=32, shuffle=True, num_workers=4, val_sp
     
     return train_dataloader, val_dataloader
 
+def plot_board_statistics(dataset: DiveDataset, sort=True):
+    # Get the board statistics from the dataset
+    statistics = dataset.get_board_statistics(sort=sort)
+    
+    # Extract the keys (values) and values (counts) from the statistics dictionary
+    values = list(statistics.keys())
+    counts = list(statistics.values())
+    
+    # Create a scatter plot with log-log axes
+    plt.figure(figsize=(10, 6))
+    plt.scatter(values, counts, alpha=0.7)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('Tile Values (log scale)')
+    plt.ylabel('Counts (log scale)')
+    plt.title('Board Statistics Scatter Plot (Log-Log Scale)')
+    plt.grid(True, which="both", ls="--")
+    plt.show()
+
+def plot_zipf_law(dataset: DiveDataset, sort=True):
+    # Get the board statistics from the dataset
+    statistics = dataset.get_board_statistics(sort=sort)
+    
+    # Extract the frequencies and sort them in descending order
+    frequencies = list(statistics.values())
+    frequencies.sort(reverse=True)
+    
+    # Create the ranks (1, 2, 3, ...)
+    ranks = range(1, len(frequencies) + 1)
+    
+    # Create a scatter plot with log-log axes
+    plt.figure(figsize=(10, 6))
+    plt.scatter(ranks, frequencies, alpha=0.7)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('Rank (log scale)')
+    plt.ylabel('Count (log scale)')
+    plt.title('Zipf\'s Law: Rank vs Count (Log-Log Scale)')
+    plt.grid(True, which="both", ls="--")
+    plt.show()
+
 if __name__ == "__main__":
     # Load the dataset
-    dataset = DiveDataset("data/grid_easy_1m.pt")
+    dataset = DiveDataset("data/data_4m.pt")
     
-    # Print board statistics
-    # print("Board Statistics:", dataset.get_board_statistics(True))
+    stat = dataset.get_board_statistics()
+    zero_count = list(stat.items())[0][1]
+    print(f"Empty tile count: {zero_count}")
+    tile_count = 16 * 4e6 - zero_count
+    top_20 = dict(list(stat.items())[1:21])
+    for key, value in top_20.items():
+        print(f"Value: {key}, Percentage: {value / tile_count * 100:.2f}")
     
     # Print baseline loss
     print("Baseline loss:", dataset.get_baseline_q_value_mse())
     
-    # Show 5 random data examples from the dataset
-    import random
-    print("\n5 Random Data Examples:")
-    for _ in range(5):
-        idx = random.randint(0, len(dataset) - 1)  # Generate a random index
-        board, q_value = dataset[idx]
-        print(f"Example {_+1}:")
-        print("Board:\n", board.numpy())  # Convert tensor to list for prettier printing
-        print("Q-value:", q_value.numpy() / dataset.q_scale)  # Convert scalar tensor to Python float
-        print()
+    # # Show 5 random data examples from the dataset
+    # import random
+    # print("\n5 Random Data Examples:")
+    # for _ in range(5):
+    #     idx = random.randint(0, len(dataset) - 1)  # Generate a random index
+    #     board, q_value = dataset[idx]
+    #     print(f"Example {_+1}:")
+    #     print("Board:\n", board.numpy())  # Convert tensor to list for prettier printing
+    #     print("Q-value:", q_value.numpy() / dataset.q_scale)  # Convert scalar tensor to Python float
+    #     print()

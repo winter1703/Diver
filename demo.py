@@ -10,7 +10,16 @@ policy_dict = {
     "Search1": search_agent.policy
 }
 
-# sim = Simulator(search_agent.policy)
-# sim.demo(interval=0.0)
+sim = Simulator(search_agent.policy, board_kwargs={"tile_spawn": [2, 3, 5, 7]})
 
-compare_policy(policy_dict, 100)
+
+import time
+
+start_time = time.time()
+sim.demo(interval=0.0)
+end_time = time.time()
+
+run_time = end_time - start_time
+print(f"Run time: {run_time:.2f} seconds")
+
+# compare_policy(policy_dict, 100)
