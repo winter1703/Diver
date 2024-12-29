@@ -62,6 +62,9 @@ class Simulator:
             print(self.board)
             time.sleep(interval)
 
+    def get_current_board(self):
+        return self.board.tiles.copy()
+
 def batch_generate_data(policy, save_path, num_workers=5, buffer_size=100000, board_kwargs={}):
     def worker(worker_id, policy, buffer_size, board_kwargs, results):
         simulator = Simulator(policy, board_kwargs)
