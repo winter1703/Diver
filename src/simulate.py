@@ -44,7 +44,7 @@ class Simulator:
                 pbar.update(1)  # Update the progress bar
 
         if save_path:
-            torch.save({"boards": boards, "q_values": q_values, "n_vocab": self.board.max_value}, save_path)
+            torch.save({"boards": boards, "q_values": q_values, "board_kwargs": self.board_kwargs}, save_path)
         else:
             return boards, q_values
 
@@ -93,10 +93,8 @@ def batch_generate_data(policy, save_path, num_workers=5, buffer_size=100000, bo
     all_boards = torch.cat([results[i][0] for i in range(num_workers)])
     all_q_values = torch.cat([results[i][1] for i in range(num_workers)])
 
-    n_vocab = board_kwargs.get("max_value", 10000)
-
     # Save the combined data
-    torch.save({"boards": all_boards, "q_values": all_q_values, "n_vocab": n_vocab}, save_path)
+    torch.save({"boards": all_boards, "q_values": all_q_values, "board_kwargs": board_kwargs}, save_path)
 
     print(f"Data generation complete. Saved to {save_path}")
 

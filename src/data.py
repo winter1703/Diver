@@ -9,7 +9,7 @@ class DiveDataset(data.Dataset):
         data = torch.load(data_path, weights_only=True)
         self.boards = data["boards"]
         self.q_values = data["q_values"]
-        self.n_vocab = data["n_vocab"]
+        self.board_kwargs = data["board_kwargs"]
         self.q_scale = q_scale
         self.augment = augment
 
@@ -112,7 +112,7 @@ def get_dataloader(data_path, batch_size=32, shuffle=True, num_workers=4, val_sp
         num_workers=num_workers
     )
     
-    return train_dataloader, val_dataloader
+    return train_dataloader, val_dataloader, dataset.board_kwargs
 
 def plot_board_statistics(dataset: DiveDataset, sort=True):
     # Get the board statistics from the dataset
@@ -163,8 +163,8 @@ if __name__ == "__main__":
     zero_count = list(stat.items())[0][1]
     print(f"Empty tile count: {zero_count}")
     tile_count = 16 * 4e6 - zero_count
-    top_20 = dict(list(stat.items())[1:21])
-    for key, value in top_20.items():
+    top_50 = dict(list(stat.items())[1:51])
+    for key, value in top_50.items():
         print(f"Value: {key}, Percentage: {value / tile_count * 100:.2f}")
     
     # Print baseline loss
